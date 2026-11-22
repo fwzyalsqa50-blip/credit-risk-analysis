@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import dash
 from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
@@ -7,7 +9,7 @@ import pandas as pd
 import numpy as np
 
 # ── Load Data ─────────────────────────────────────────────────────────────────
-df = pd.read_csv(r"D:\Data analyst\Credit_Risk\UCI_Credit_Card.csv")
+df = pd.read_csv(Path(__file__).resolve().parent / "UCI_Credit_Card.csv")
 df.rename(columns={'default.payment.next.month': 'default'}, inplace=True)
 df.drop('ID', axis=1, inplace=True)
 
@@ -16,11 +18,17 @@ total_clients   = len(df)
 total_defaults  = df['default'].sum()
 default_rate    = df['default'].mean() * 100
 avg_limit       = df['LIMIT_BAL'].mean()
-losses_prevented = 796 * 50000
+illustrative_exposure = 796 * 50000  # Assumed NT$50,000 per true positive; not realized savings.
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 app.title = "Credit Risk Dashboard"
+app.index_string = """<!DOCTYPE html>
+<html><head>{%metas%}<title>{%title%}</title>{%favicon%}{%css%}
+<style>.rc-slider-mark-text, .dash-slider-mark { color: #CBD5E1 !important; }
+.dash-range-slider-input { color: #F8FAFC !important; background: #334155 !important; border-color: #64748B !important; }
+.rc-slider-tooltip-inner { color: #FFFFFF; background: #334155; }</style>
+</head><body>{%app_entry%}<footer>{%config%}{%scripts%}{%renderer%}</footer></body></html>"""
 
 TEAL  = "#028090"
 CORAL = "#FF6B6B"
@@ -45,28 +53,39 @@ app.layout = dbc.Container([
         dbc.Col([
             html.H1("Credit Risk Analytics Dashboard",
                     style={"color": TEAL, "fontWeight": "bold", "marginBottom": "4px"}),
-            html.P("UCI Credit Card Dataset  |  30,000 Clients  |  Polynomial Logistic Regression",
-                   style={"color": "#64748B", "fontSize": "0.9rem"})
+            html.P("Educational portfolio | UCI dataset | Stored model results and separate rules-based demo",
+                   style={"color": "#CBD5E1", "fontSize": "0.9rem"})
         ])
     ], style={"padding": "24px 0 12px 0"}),
 
     html.Hr(style={"borderColor": TEAL, "marginBottom": "24px"}),
+    dbc.Alert(
+        "Notebook model scores below are stored results from one split. "
+        "The sliders are a hand-written rules demo, not trained-model predictions. "
+        "This educational project is not a lending decision tool.",
+        color="info", className="mb-4"
+    ),
 
     # KPI Cards
     dbc.Row([
-        dbc.Col(kpi_card("Total Clients",     f"{total_clients:,}",          TEAL,  "👥"), width=3),
-        dbc.Col(kpi_card("Total Defaults",    f"{total_defaults:,}",         CORAL, "⚠️"), width=3),
-        dbc.Col(kpi_card("Default Rate",      f"{default_rate:.1f}%",        GOLD,  "📊"), width=3),
-        dbc.Col(kpi_card("Avg Credit Limit",  f"NT${avg_limit:,.0f}",        TEAL,  "💳"), width=3),
+        dbc.Col(kpi_card("Total Clients",     f"{total_clients:,}",          TEAL,  "N"), width=3),
+        dbc.Col(kpi_card("Total Defaults",    f"{total_defaults:,}",         CORAL, "!"), width=3),
+        dbc.Col(kpi_card("Default Rate",      f"{default_rate:.1f}%",        GOLD,  "%"), width=3),
+        dbc.Col(kpi_card("Avg Credit Limit",  f"NT${avg_limit:,.0f}",        TEAL,  "NT$"), width=3),
     ], className="mb-4"),
 
     dbc.Row([
-        dbc.Col(kpi_card("Model AUC",         "0.7551",                      TEAL,  "🎯"), width=3),
-        dbc.Col(kpi_card("Model Accuracy",    "75.03%",                      GOLD,  "✅"), width=3),
-        dbc.Col(kpi_card("Detection Rate",    "60.0%",                       CORAL, "🔍"), width=3),
-        dbc.Col(kpi_card("Losses Prevented",  f"NT${losses_prevented:,}",    TEAL,  "💰"), width=3),
+        dbc.Col(kpi_card("Stored Model AUC",         "0.7551",                      TEAL,  "AUC"), width=3),
+        dbc.Col(kpi_card("Stored Model Accuracy",    "75.03%",                      GOLD,  "OK"), width=3),
+        dbc.Col(kpi_card("Stored Default Recall",    "60.0%",                       CORAL, "R"), width=3),
+        dbc.Col(kpi_card("Illustrative Exposure, Not Savings",  f"NT${illustrative_exposure:,}",    TEAL,  "NT$"), width=3),
     ], className="mb-4"),
 
+    html.P(
+        "Illustrative exposure = 796 true positives x an assumed NT$50,000 per case. "
+        "This is a scenario calculation, not measured or guaranteed loss prevention.",
+        style={"color": "#CBD5E1", "fontSize": "0.9rem"}
+    ),
     html.Hr(style={"borderColor": "#334155", "marginBottom": "24px"}),
 
     # Row 1: Default Distribution + Age Distribution
@@ -136,7 +155,7 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("Model Confusion Matrix",
+                dbc.CardHeader("Stored Model Confusion Matrix",
                                style={"color": WHITE, "background": DARK,
                                       "borderBottom": f"2px solid {TEAL}"}),
                 dbc.CardBody([dcc.Graph(id="confusion-matrix")])
@@ -145,7 +164,7 @@ app.layout = dbc.Container([
 
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("Interactive Risk Assessment",
+                dbc.CardHeader("Illustrative Rules Demo, Not Model Prediction",
                                style={"color": WHITE, "background": DARK,
                                       "borderBottom": f"2px solid {GOLD}"}),
                 dbc.CardBody([
@@ -178,7 +197,7 @@ app.layout = dbc.Container([
 
     # Footer
     html.Hr(style={"borderColor": "#334155"}),
-    html.P("Credit Risk Analytics  |  Polynomial Logistic Regression  |  2026",
+    html.P("Educational Credit Risk Analytics | Stored notebook evaluation + rules demo | Not for lending decisions",
            style={"color": "#475569", "textAlign": "center", "fontSize": "0.8rem",
                   "paddingBottom": "16px"})
 
@@ -303,23 +322,23 @@ def risk_assessment(pay, limit, age):
     base_prob = min(base_prob, 0.97)
 
     if base_prob < 0.30:
-        risk, color, action = "LOW RISK",      TEAL,  "Approve credit increase"
-        emoji = "✅"
+        risk, color, action = "LOW RISK",      TEAL,  "Illustrative lower-risk band"
+        emoji = "OK"
     elif base_prob < 0.60:
-        risk, color, action = "MODERATE RISK", GOLD,  "Monitor account closely"
-        emoji = "⚠️"
+        risk, color, action = "MODERATE RISK", GOLD,  "Illustrative middle-risk band"
+        emoji = "!"
     else:
-        risk, color, action = "HIGH RISK",     CORAL, "Reduce limit / Flag for review"
-        emoji = "🚨"
+        risk, color, action = "HIGH RISK",     CORAL, "Illustrative higher-risk band"
+        emoji = "!"
 
     return [
         html.Div(emoji, style={"fontSize": "2.5rem"}),
         html.H2(f"{base_prob:.0%}", style={"color": color, "fontWeight": "bold", "margin": "8px 0"}),
-        html.H4("Default Probability", style={"color": "#94A3B8", "margin": "0"}),
+        html.H4("Heuristic Demo Score (Not a Probability)", style={"color": "#94A3B8", "margin": "0"}),
         html.Hr(style={"borderColor": color, "margin": "12px 0"}),
         html.H3(risk, style={"color": color, "fontWeight": "bold", "margin": "0"}),
         html.P(action, style={"color": "#CBD5E1", "margin": "8px 0 0 0"})
     ]
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
